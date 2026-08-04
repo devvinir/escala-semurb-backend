@@ -453,9 +453,9 @@ if (n > 7 || m > 7) {
 }
 
 // Verifica se precisa de dias específicos
-const precisa_dias_especificos = use_occasion === 'SIM'
+const precisa_occasion = use_occasion === 'SIM'
 
-if (precisa_dias_especificos) {
+if (precisa_occasion) {
   const diasArray = Array.isArray(unwork_scale)
     ? unwork_scale
     : []
@@ -495,20 +495,20 @@ if (precisa_dias_especificos) {
       return res.status(400).json({ mensagem: 'Funcionário não encontrado' })
 
     // verificar se funcionario ja possui escala
-    if (funcionarioExistente.id_escala) {
+    if (funcionarioExistente.id_scale) {
       return res.status(400).json({ mensagem: 'Funcionário já possui uma escala vinculada' })
     }
 
     // Inserir escala
     const { data: escalaCriada, error: errorEscala } = await supabase
-      .from('escala')
+      .from('scale')
       .insert([
         {
           start_date,
           scale_type,
-          dias_trabalhados: n,
-          dias_n_trabalhados: m,
-          unwork_scale: precisa_dias_especificos
+          work_day: n,
+          unwork_day: m,
+          unwork_scale: precisa_occasion
             ? unwork_scale
             : null
         }
@@ -523,7 +523,7 @@ if (precisa_dias_especificos) {
     // Vincular escala ao funcionário
     const { error: errorVinculo } = await supabase
       .from('employee')
-      .update({ id_escala: escalaCriada.id_escala })
+      .update({ id_scale: escalaCriada.id_scale })
       .eq('registration', registration)
 
     if (errorVinculo) {
@@ -546,7 +546,7 @@ if (precisa_dias_especificos) {
       .insert([
         {
           registration: funcionarioExistente.registration,
-          id_escala: escalaCriada.id_escala
+          id_scale: escalaCriada.id
         }
       ])
       .select('*')
@@ -624,9 +624,9 @@ if (n > 7 || m > 7) {
 }
 
 // Verifica se precisa de dias específicos
-const precisa_dias_especificos = use_occasion === 'SIM'
+const precisa_occasion = use_occasion === 'SIM'
 
-if (precisa_dias_especificos) {
+if (precisa_occasion) {
   const diasArray = Array.isArray(unwork_scale)
     ? unwork_scale
     : []
@@ -665,23 +665,23 @@ if (precisa_dias_especificos) {
       .maybeSingle()
     if (!funcionarioExistente)
       return res.status(400).json({ mensagem: 'Funcionário não encontrado' })
-    if (!funcionarioExistente.id_escala)
+    if (!funcionarioExistente.id_scale)
       return res.status(400).json({ mensagem: 'Funcionário não possui escala vinculada' })
 
     // Alterar escala
     const { data: escalaAtualizada, error } = await supabase
-      .from('escala')
+      .from('scale')
       .update({
         start_date,
         scale_type,
-        dias_trabalhados: n,
-        dias_n_trabalhados: m,
-        unwork_scale: precisa_dias_especificos
+        work_day: n,
+        unwork_day: m,
+        unwork_scale: precisa_occasion
           ? unwork_scale
           : [],
-        use_occasion: precisa_dias_especificos
+        use_occasion: precisa_occasion
       })
-      .eq('id_escala', funcionarioExistente.id_escala)
+      .eq('id', funcionarioExistente.id_scale)
       .select()
       .single()
 
@@ -699,11 +699,11 @@ if (precisa_dias_especificos) {
     // confirmacao
 
      // remover confirmação antiga (se existir) associada à escala anterior do funcionário
-        if (funcionarioExistente.id_escala) {
+        if (funcionarioExistente.id_scale) {
           const { error: errorDeletar } = await supabase
             .from('escala_confirmacao')
             .delete()
-            .eq('id_escala', funcionarioExistente.id_escala)
+            .eq('id_scale', funcionarioExistente.id_scale)
             .eq('registration', funcionarioExistente.registration)
     
         // criar nova confirmação para a escala atualizada
@@ -712,7 +712,7 @@ if (precisa_dias_especificos) {
           .insert([
             {
               registration: funcionarioExistente.registration,
-              id_escala: escalaAtualizada.id_escala
+              id_scale: escalaAtualizada.id_scale
             }
           ])
           .select('*')
@@ -797,7 +797,7 @@ route.post('/cadastrarTurno_master', async (req, res) => {
     }
 
     // garantir que o funcionario possua escala antes de buscar turnos
-    if (!funcionarioExistente.id_escala) {
+    if (!funcionarioExistente.id_scale) {
       return res.status(400).json({
         mensagem:
           'Funcionário não possui escala vinculada. Cadastre uma escala antes de adicionar um turno.'
@@ -938,10 +938,9 @@ route.get('/listarTurnos_master', async (req, res) => {
 //sectores
 
 // Criar sector
-route.post('/cadastrarsector', async (req, res) => {
+route.post('/cadastrarSetor', async (req, res) => {
   try {
-    const { nome_sector } = req.body
-
+    const { nome_sector } = req.bodyu
     if (!nome_sector) {
       return res.status(400).json({ mensagem: 'Informe o name do sector' })
     }
@@ -950,7 +949,7 @@ route.post('/cadastrarsector', async (req, res) => {
     const { data: sectorExistente } = await supabase
       .from('sector')
       .select('*')
-      .eq('nome_sector', nome_sector)
+      .eq('name', nome_sector)
       .maybeSingle()
 
     if (sectorExistente) {
@@ -963,8 +962,8 @@ route.post('/cadastrarsector', async (req, res) => {
       return res.status(400).json({ mensagem: 'Erro ao cadastrar sector', erro: error })
     }
 
-    //criar team padrao de adm no sector
-    await supabase.from('team').insert([{ nome_team: `${nome_sector}(ADM)`, id_sector: data[0].id_sector }])
+    //criar equipe padrao de adm no setor
+    await supabase.from('team').insert([{ name: `${nome_sector}(ADM)`, id_sector: data[0].id }])
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao criar team padrão do sector', erro: error })
@@ -1119,7 +1118,7 @@ route.post('/cadastrarDiaEspecifico_master', async (req, res) => {
 
     // verifica se já existe um dia específico cadastrado na mesma data para o mesmo funcionário
     const { data: diaExistente, error: errorCheck } = await supabase
-      .from('dias_especificos')
+      .from('occasion')
       .select('*')
       .eq('registration', registration)
       .eq('data_diae', data_diae)
@@ -1140,7 +1139,7 @@ route.post('/cadastrarDiaEspecifico_master', async (req, res) => {
 
     // insere o novo dia específico
     const { data: diaEspecifico, error } = await supabase
-      .from('dias_especificos')
+      .from('occasion')
       .insert([{
         registration,
         nome_diae,

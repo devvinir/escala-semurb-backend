@@ -153,8 +153,8 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
     // buscar sector para associar ao funcionário
     const { data: sectorData, error: sectorError } = await supabase
       .from('sector')
-      .select('id_sector')
-      .eq('nome_sector', sector)
+      .select('id')
+      .eq('name', sector)
       .maybeSingle()
 
     if (sectorError || !sectorData) {
@@ -164,9 +164,9 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
     //buscar team do sector para associar ao funcionário
     const { data: teamData, error: teamError } = await supabase
       .from('team')
-      .select('id_team')
-      .eq('nome_team', team)
-      .eq('id_sector', sectorData.id_sector)
+      .select('id')
+      .eq('name', team)
+      .eq('id', sectorData.id)
       .maybeSingle()
 
     if (teamError) {
@@ -174,7 +174,7 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
     } else if (!teamData) {
       const { data: novateamData, error: novateamError } = await supabase
         .from('team')
-        .insert([{ nome_team: team, id_sector: sectorData.id_sector }])
+        .insert([{ name: team, id_sector: sectorData.id }])
         .select()
         .maybeSingle()
 
@@ -184,14 +184,14 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
           .json({ mensagem: 'Erro ao criar nova team', erro: novateamError })
       }
 
-      teamData.id_team = novateamData.id_team
+      teamData.id = novateamData.id
     }
 
     //buscar região e se nao existir criar outra
     const { data: regionData, error: regionError } = await supabase
       .from('region')
-      .select('id_region')
-      .eq('nome_region', region)
+      .select('id')
+      .eq('name', region)
       .maybeSingle()
 
     if (regionError) {
@@ -199,7 +199,7 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
     } else if (!regionData) {
       const { data: novaregionData, error: novaregionError } = await supabase
         .from('region')
-        .insert([{ nome_region: region }])
+        .insert([{ name: region }])
         .select()
         .maybeSingle()
 
@@ -209,7 +209,7 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
           .json({ mensagem: 'Erro ao criar nova region', erro: novaregionError })
       }
 
-      regionData.id_region = novaregionData.id_region
+      regionData.id = novaregionData.id
     }
 
     // Inserir funcionário
@@ -223,9 +223,9 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
           password: passwordHash,
           phone: phone,
           position: position,
-          id_team: teamData.id_team,
-          id_region: regionData.id_region,
-          id_sector: sectorData.id_sector,
+          id_team: teamData.id,
+          id_region: regionData.id,
+          id_sector: sectorData.id,
           is_admin: is_admin
         }
       ])
@@ -406,7 +406,7 @@ route.delete('/deletarFuncionario_master/:registration', async (req, res) => {
 // Cadastrar escala e vincular ao funcionário
 // POST /cadastrarEscala
 route.post('/cadastrarEscala_master', async (req, res) => {
-  const obrigatorios = ['registration', 'data_inicio', 'tipo_escala']
+  const obrigatorios = ['registration', 'start_date', 'scale_type']
   const campoFaltando = validarCampos(obrigatorios, req.body)
   if (campoFaltando)
     return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
@@ -414,15 +414,15 @@ route.post('/cadastrarEscala_master', async (req, res) => {
   try {
     const {
       registration,
-      data_inicio,
-      tipo_escala,
-      dias_n_trabalhados_escala_semanal,
-      usa_dias_especificos
+      start_date,
+      scale_type,
+      unwork_scale,
+      use_occasion
     } = req.body
 
     // Interpretar escala tipo NxM
 const padrao = /^(\d{1,2})x(\d{1,2})$/
-const match = tipo_escala.match(padrao)
+const match = scale_type.match(padrao)
 if (!match)
   return res.status(400).json({ mensagem: 'Tipo de escala inválido' })
 
@@ -453,11 +453,11 @@ if (n > 7 || m > 7) {
 }
 
 // Verifica se precisa de dias específicos
-const precisa_dias_especificos = usa_dias_especificos === 'SIM'
+const precisa_dias_especificos = use_occasion === 'SIM'
 
 if (precisa_dias_especificos) {
-  const diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
-    ? dias_n_trabalhados_escala_semanal
+  const diasArray = Array.isArray(unwork_scale)
+    ? unwork_scale
     : []
 
   if (diasArray.length === 0)
@@ -504,12 +504,12 @@ if (precisa_dias_especificos) {
       .from('escala')
       .insert([
         {
-          data_inicio,
-          tipo_escala,
+          start_date,
+          scale_type,
           dias_trabalhados: n,
           dias_n_trabalhados: m,
-          dias_n_trabalhados_escala_semanal: precisa_dias_especificos
-            ? dias_n_trabalhados_escala_semanal
+          unwork_scale: precisa_dias_especificos
+            ? unwork_scale
             : null
         }
       ])
@@ -536,7 +536,7 @@ if (precisa_dias_especificos) {
     await criarNotificacao({
       registration,
       tipo_notificacao: 'Nova Escala',
-      mensagem: `Sua nova escala foi cadastrada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
+      mensagem: `Sua nova escala foi cadastrada: Início em ${start_date}, Tipo: ${scale_type}. Por favor, confirme o recebimento da escala no sistema.`,
     })
 
     // confirmacao
@@ -577,7 +577,7 @@ if (precisa_dias_especificos) {
 
 // PUT /alterarEscala
 route.put('/alterarEscala_master', async (req, res) => {
-  const obrigatorios = ['registration', 'data_inicio', 'tipo_escala']
+  const obrigatorios = ['registration', 'start_date', 'scale_type']
   const campoFaltando = validarCampos(obrigatorios, req.body)
   if (campoFaltando)
     return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
@@ -585,15 +585,15 @@ route.put('/alterarEscala_master', async (req, res) => {
   try {
     const {
       registration,
-      data_inicio,
-      tipo_escala,
-      dias_n_trabalhados_escala_semanal,
-      usa_dias_especificos
+      start_date,
+      scale_type,
+      unwork_scale,
+      use_occasion
     } = req.body
 
         // Interpretar escala tipo NxM
 const padrao = /^(\d{1,2})x(\d{1,2})$/
-const match = tipo_escala.match(padrao)
+const match = scale_type.match(padrao)
 if (!match)
   return res.status(400).json({ mensagem: 'Tipo de escala inválido' })
 
@@ -624,11 +624,11 @@ if (n > 7 || m > 7) {
 }
 
 // Verifica se precisa de dias específicos
-const precisa_dias_especificos = usa_dias_especificos === 'SIM'
+const precisa_dias_especificos = use_occasion === 'SIM'
 
 if (precisa_dias_especificos) {
-  const diasArray = Array.isArray(dias_n_trabalhados_escala_semanal)
-    ? dias_n_trabalhados_escala_semanal
+  const diasArray = Array.isArray(unwork_scale)
+    ? unwork_scale
     : []
 
   if (diasArray.length === 0)
@@ -672,14 +672,14 @@ if (precisa_dias_especificos) {
     const { data: escalaAtualizada, error } = await supabase
       .from('escala')
       .update({
-        data_inicio,
-        tipo_escala,
+        start_date,
+        scale_type,
         dias_trabalhados: n,
         dias_n_trabalhados: m,
-        dias_n_trabalhados_escala_semanal: precisa_dias_especificos
-          ? dias_n_trabalhados_escala_semanal
+        unwork_scale: precisa_dias_especificos
+          ? unwork_scale
           : [],
-        usa_dias_especificos: precisa_dias_especificos
+        use_occasion: precisa_dias_especificos
       })
       .eq('id_escala', funcionarioExistente.id_escala)
       .select()
@@ -693,7 +693,7 @@ if (precisa_dias_especificos) {
     await criarNotificacao({
       registration,
       tipo_notificacao: 'Atualização de Escala',
-      mensagem: `Sua escala foi atualizada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
+      mensagem: `Sua escala foi atualizada: Início em ${start_date}, Tipo: ${scale_type}. Por favor, confirme o recebimento da escala no sistema.`,
     })
 
     // confirmacao

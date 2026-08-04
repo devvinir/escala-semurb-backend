@@ -703,9 +703,9 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
     // Verificar se matrícula já existe
     const { data: funcionarioExistente } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
 
     if (funcionarioExistente) {
@@ -714,25 +714,25 @@ route.post('/cadastrarFuncionario', async (req, res) => {
 
     // verificar setor do adm para vincular ao funcionario
     const { data: adm } = await supabase
-      .from('funcionario')
+      .from('emp´loyee')
       .select('id_setor')
-      .eq('matricula_funcionario', matricula_adm)
+      .eq('registration', matricula_adm)
       .maybeSingle()
 
     // Inserir funcionário
     const { data, error } = await supabase
-      .from('funcionario')
+      .from('employee')
       .insert([
         {
-          matricula_funcionario: matricula_funcionario,
-          nome: nome,
+          registration: matricula_funcionario,
+          name: nome,
           email: email,
-          senha: senhaHash,
-          telefone: telefone,
-          id_regiao: regiaoId,
-          id_equipe: equipeId,
-          id_setor: adm.id_setor,
-          cargo: cargo
+          password: senhaHash,
+          phone: telefone,
+          id_region: regiaoId,
+          id_team: equipeId,
+          id_sector: adm.id_setor,
+          position: cargo
         }
       ])
       .select()

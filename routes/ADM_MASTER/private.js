@@ -13,7 +13,7 @@ function validarCampos(campos, body) {
 }
 
 async function criarNotificacao({
-  matricula_funcionario = null,
+  registration = null,
   tipo_notificacao = 'GENÉRICA',
   mensagem = '',
   matricula_responsavel = null
@@ -21,7 +21,7 @@ async function criarNotificacao({
   try {
     const { error } = await supabase.from('notificacoes').insert([
       {
-        matricula_funcionario,
+        registration,
         tipo_notificacao,
         mensagem,
         matricula_responsavel,
@@ -38,25 +38,26 @@ async function criarNotificacao({
   }
 }
 
-//contabilizar funcionarios por setor para grafico
+//contabilizar funcionarios por sector para grafico
 route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   try {
-    // buscar todos os funcionários trazendo id_setor e relacionamento setor.nome_setor
-    const { data, error } = await supabase.from('funcionario').select('id_setor, setor(nome_setor)')
+    // buscar todos os funcionários trazendo id_sector e relacionamento sector.nome_sector
+    const { data, error } = await supabase.from
+    ('employee').select('id_sector, sector(name)')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
     }
 
-    // agregar contagem por setor (funcionários sem setor aparecem como "Sem setor" com id_setor = null)
+    // agregar contagem por sector (funcionários sem sector aparecem como "Sem sector" com id_sector = null)
     const mapa = new Map()
     for (const f of data || []) {
-      const id = f.id_setor ?? null
-      const nome = f.setor?.nome_setor ?? 'Sem setor'
+      const id = f.id_sector ?? null
+      const name = f.sector?.nome_sector ?? 'Sem sector'
       const key = id === null ? 'null' : String(id)
 
       if (!mapa.has(key)) {
-        mapa.set(key, { id_setor: id, nome_setor: nome, quantidade: 0 })
+        mapa.set(key, { id_sector: id, nome_sector: name, quantidade: 0 })
       }
       mapa.get(key).quantidade += 1
     }
@@ -68,16 +69,16 @@ route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   }
 })
 
-//listar quipes
+//listar equipes
 route.get('/listarEquipes_master', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('equipe').select('*')
+    const { data, error } = await supabase.from('team').select('*')
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao listar equipes', erro: error })
+      return res.status(400).json({ mensagem: 'Erro ao listar teams', erro: error })
     }
 
-    res.status(200).json({ equipes: data })
+    res.status(200).json({ teams: data })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
@@ -86,7 +87,7 @@ route.get('/listarEquipes_master', async (req, res) => {
 // listar regioes
 route.get('/listarRegioes_master', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('regiao').select('*')
+    const { data, error } = await supabase.from('region').select('*')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao listar regiões', erro: error })
@@ -102,130 +103,130 @@ route.get('/listarRegioes_master', async (req, res) => {
 route.post('/cadastrarFuncionario_master', async (req, res) => {
   try {
     const {
-      matricula_funcionario,
-      nome,
+      registration,
+      name,
       email,
-      telefone,
-      cargo,
-      setor,
-      status_permissao,
-      equipe,
-      regiao
+      phone,
+      position,
+      sector,
+      is_admin,
+      team,
+      region
     } = req.body
 
     if (
-      !matricula_funcionario ||
-      !nome ||
+      !registration ||
+      !name ||
       !email ||
-      !telefone ||
-      !cargo ||
-      !setor ||
-      !status_permissao ||
-      !equipe ||
-      !regiao
+      !phone ||
+      !position ||
+      !sector ||
+      !is_admin ||
+      !team ||
+      !region
     ) {
       return res.status(400).json({ mensagem: 'Preencha todos os campos obrigatórios' })
     }
 
     //verificar se matricula possui 5 digitos
-    if (String(req.body.matricula_funcionario).length !== 5) {
+    if (String(req.body.registration).length !== 5) {
       return res.status(400).json({ mensagem: 'A matrícula deve conter exatamente 5 dígitos' })
     }
 
-    const senha = matricula_funcionario.toString()
+    const password = registration.toString()
 
-    // Criptografar senha
+    // Criptografar password
     const salt = await bcrypt.genSalt(10)
-    const senhaHash = await bcrypt.hash(senha, salt)
+    const passwordHash = await bcrypt.hash(password, salt)
 
     // Verificar se matrícula já existe
     const { data: funcionarioExistente } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
 
     if (funcionarioExistente) {
       return res.status(400).json({ mensagem: 'Matrícula já cadastrada' })
     }
 
-    // buscar setor para associar ao funcionário
-    const { data: setorData, error: setorError } = await supabase
-      .from('setor')
-      .select('id_setor')
-      .eq('nome_setor', setor)
+    // buscar sector para associar ao funcionário
+    const { data: sectorData, error: sectorError } = await supabase
+      .from('sector')
+      .select('id_sector')
+      .eq('nome_sector', sector)
       .maybeSingle()
 
-    if (setorError || !setorData) {
-      return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
+    if (sectorError || !sectorData) {
+      return res.status(400).json({ mensagem: 'sector não encontrado', erro: sectorError })
     }
 
-    //buscar equipe do setor para associar ao funcionário
-    const { data: equipeData, error: equipeError } = await supabase
-      .from('equipe')
-      .select('id_equipe')
-      .eq('nome_equipe', equipe)
-      .eq('id_setor', setorData.id_setor)
+    //buscar team do sector para associar ao funcionário
+    const { data: teamData, error: teamError } = await supabase
+      .from('team')
+      .select('id_team')
+      .eq('nome_team', team)
+      .eq('id_sector', sectorData.id_sector)
       .maybeSingle()
 
-    if (equipeError) {
-      return res.status(400).json({ mensagem: 'Erro ao buscar equipe', erro: equipeError })
-    } else if (!equipeData) {
-      const { data: novaEquipeData, error: novaEquipeError } = await supabase
-        .from('equipe')
-        .insert([{ nome_equipe: equipe, id_setor: setorData.id_setor }])
+    if (teamError) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar team', erro: teamError })
+    } else if (!teamData) {
+      const { data: novateamData, error: novateamError } = await supabase
+        .from('team')
+        .insert([{ nome_team: team, id_sector: sectorData.id_sector }])
         .select()
         .maybeSingle()
 
-      if (novaEquipeError) {
+      if (novateamError) {
         return res
           .status(400)
-          .json({ mensagem: 'Erro ao criar nova equipe', erro: novaEquipeError })
+          .json({ mensagem: 'Erro ao criar nova team', erro: novateamError })
       }
 
-      equipeData.id_equipe = novaEquipeData.id_equipe
+      teamData.id_team = novateamData.id_team
     }
 
-    //buscar regiao e se nao existir criar outra
-    const { data: regiaoData, error: regiaoError } = await supabase
-      .from('regiao')
-      .select('id_regiao')
-      .eq('nome_regiao', regiao)
+    //buscar região e se nao existir criar outra
+    const { data: regionData, error: regionError } = await supabase
+      .from('region')
+      .select('id_region')
+      .eq('nome_region', region)
       .maybeSingle()
 
-    if (regiaoError) {
-      return res.status(400).json({ mensagem: 'Erro ao buscar regiao', erro: regiaoError })
-    } else if (!regiaoData) {
-      const { data: novaregiaoData, error: novaregiaoError } = await supabase
-        .from('regiao')
-        .insert([{ nome_regiao: regiao }])
+    if (regionError) {
+      return res.status(400).json({ mensagem: 'Erro ao buscar region', erro: regionError })
+    } else if (!regionData) {
+      const { data: novaregionData, error: novaregionError } = await supabase
+        .from('region')
+        .insert([{ nome_region: region }])
         .select()
         .maybeSingle()
 
-      if (novaregiaoError) {
+      if (novaregionError) {
         return res
           .status(400)
-          .json({ mensagem: 'Erro ao criar nova regiao', erro: novaregiaoError })
+          .json({ mensagem: 'Erro ao criar nova region', erro: novaregionError })
       }
 
-      regiaoData.id_regiao = novaregiaoData.id_regiao
+      regionData.id_region = novaregionData.id_region
     }
 
     // Inserir funcionário
     const { data, error } = await supabase
-      .from('funcionario')
+      .from('employee')
       .insert([
         {
-          matricula_funcionario: matricula_funcionario,
-          nome: nome,
+          registration: registration,
+          name: name,
           email: email,
-          senha: senhaHash,
-          telefone: telefone,
-          cargo: cargo,
-          id_equipe: equipeData.id_equipe,
-          id_regiao: regiaoData.id_regiao,
-          id_setor: setorData.id_setor,
-          status_permissao: status_permissao
+          password: passwordHash,
+          phone: phone,
+          position: position,
+          id_team: teamData.id_team,
+          id_region: regionData.id_region,
+          id_sector: sectorData.id_sector,
+          is_admin: is_admin
         }
       ])
       .select()
@@ -243,7 +244,8 @@ route.post('/cadastrarFuncionario_master', async (req, res) => {
 // Listar Funcionários
 route.get('/listarFuncionarios_master', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('funcionario').select('*')
+    const { data, error } = await supabase
+    .from('employee').select('*')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao listar funcionários', erro: error })
@@ -255,16 +257,16 @@ route.get('/listarFuncionarios_master', async (req, res) => {
   }
 })
 
-// Editar funcionário (dados e permissão, sem senha)
-route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) => {
+// Editar funcionário (dados e permissão, sem password)
+route.put('/editarFuncionario_master/:registration', async (req, res) => {
   try {
-    const { matricula_funcionario } = req.params
-    const { email, telefone, cargo, setor, status_permissao, equipe, regiao } = req.body
+    const { registration } = req.params
+    const { email, phone, position, sector, is_admin, team, region } = req.body
 
     const { data: funcionarioDesatualizado } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
 
     if (!funcionarioDesatualizado) {
@@ -272,75 +274,75 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
       return res.status(404).json({ mensagem: 'Funcionário não encontrado' })
     }
 
-    let id_setor = funcionarioDesatualizado.id_setor
-    if (setor) {
-      const { data: setorData, error: setorError } = await supabase
-        .from('setor')
-        .select('id_setor')
-        .eq('nome_setor', setor)
+    let id_sector = funcionarioDesatualizado.id_sector
+    if (sector) {
+      const { data: sectorData, error: sectorError } = await supabase
+        .from('sector')
+        .select('id_sector')
+        .eq('nome_sector', sector)
         .maybeSingle()
 
-      if (setorError || !setorData) {
-        console.log('Setor não encontrado:', setor)
-        return res.status(400).json({ mensagem: 'Setor não encontrado', erro: setorError })
+      if (sectorError || !sectorData) {
+        console.log('sector não encontrado:', sector)
+        return res.status(400).json({ mensagem: 'sector não encontrado', erro: sectorError })
       }
 
-      id_setor = setorData.id_setor
+      id_sector = sectorData.id_sector
     }
 
-    //verificar se equipe existe no setor do funcionário e atualizar se necessário
-    const { data: equipeData, error: equipeError } = await supabase
-      .from('equipe')
-      .select('id_equipe')
-      .eq('nome_equipe', equipe)
-      .eq('id_setor', id_setor)
+    //verificar se team existe no sector do funcionário e atualizar se necessário
+    const { data: teamData, error: teamError } = await supabase
+      .from('team')
+      .select('id_team')
+      .eq('nome_team', team)
+      .eq('id_sector', id_sector)
       .maybeSingle()
 
-    if (equipeError) {
-      console.log('Erro ao buscar equipe:', equipeError)
-      return res.status(400).json({ mensagem: 'Erro ao buscar equipe', erro: equipeError })
-    } else if (equipe && !equipeData) {
-      console.log('Equipe não encontrada no setor:', equipe)
-      return res.status(400).json({ mensagem: 'Equipe não encontrada no setor' })
+    if (teamError) {
+      console.log('Erro ao buscar team:', teamError)
+      return res.status(400).json({ mensagem: 'Erro ao buscar team', erro: teamError })
+    } else if (team && !teamData) {
+      console.log('team não encontrada no sector:', team)
+      return res.status(400).json({ mensagem: 'team não encontrada no sector' })
     }
 
-    // verificar regiao e atualizar se necessário
-    let id_regiao = funcionarioDesatualizado.id_regiao
-    if (regiao) {
-      const { data: regiaoData, error: regiaoError } = await supabase
-        .from('regiao')
-        .select('id_regiao')
-        .eq('nome_regiao', regiao)
+    // verificar region e atualizar se necessário
+    let id_region = funcionarioDesatualizado.id_region
+    if (region) {
+      const { data: regionData, error: regionError } = await supabase
+        .from('region')
+        .select('id_region')
+        .eq('nome_region', region)
         .maybeSingle()
 
-      if (regiaoError) {
-        console.log('Erro ao buscar regiao:', regiaoError)
-        return res.status(400).json({ mensagem: 'Erro ao buscar regiao', erro: regiaoError })
-      } else if (!regiaoData) {
-        console.log('Regiao não encontrada:', regiao)
-        return res.status(400).json({ mensagem: 'Regiao não encontrada' })
+      if (regionError) {
+        console.log('Erro ao buscar region:', regionError)
+        return res.status(400).json({ mensagem: 'Erro ao buscar region', erro: regionError })
+      } else if (!regionData) {
+        console.log('region não encontrada:', region)
+        return res.status(400).json({ mensagem: 'region não encontrada' })
       }
-      id_regiao = regiaoData.id_regiao
+      id_region = regionData.id_region
     }
 
     const payloadToUpdate = {
       email: email !== undefined ? email : funcionarioDesatualizado.email,
-      telefone: telefone !== undefined ? telefone : funcionarioDesatualizado.telefone,
-      cargo: cargo !== undefined ? cargo : funcionarioDesatualizado.cargo,
-      id_setor: id_setor,
-      status_permissao:
-        status_permissao !== undefined
-          ? status_permissao
-          : funcionarioDesatualizado.status_permissao,
-      id_equipe: equipeData ? equipeData.id_equipe : funcionarioDesatualizado.equipe,
-      id_regiao: id_regiao
+      phone: phone !== undefined ? phone : funcionarioDesatualizado.phone,
+      position: position !== undefined ? position : funcionarioDesatualizado.position,
+      id_sector: id_sector,
+      is_admin:
+        is_admin !== undefined
+          ? is_admin
+          : funcionarioDesatualizado.is_admin,
+      id_team: teamData ? teamData.id_team : funcionarioDesatualizado.team,
+      id_region: id_region
     }
 
     const { data: funcionarioAtualizado, error } = await supabase
-      .from('funcionario')
+      .from('employee')
       .update(payloadToUpdate)
-      .eq('matricula_funcionario', matricula_funcionario)
-      .select('email, telefone, cargo, status_permissao, setor(nome_setor)')
+      .eq('registration', registration)
+      .select('email, phone, position, is_admin, sector(nome_sector)')
       .maybeSingle()
 
     if (error) {
@@ -359,15 +361,15 @@ route.put('/editarFuncionario_master/:matricula_funcionario', async (req, res) =
 })
 
 // Deletar Funcionário
-route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, res) => {
+route.delete('/deletarFuncionario_master/:registration', async (req, res) => {
   try {
-    const { matricula_funcionario } = req.params
+    const { registration } = req.params
 
     // apaga as notificacoes do funcoinario primeiro
     const { error: notifError } = await supabase
       .from('notificacoes')
       .delete()
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
 
     if (notifError) {
       return res.status(400).json({ mensagem: 'Erro ao deletar notificações', erro: notifError })
@@ -377,7 +379,7 @@ route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, re
     const { error: confirmError } = await supabase
       .from('escala_confirmacao')
       .delete()
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
 
     if (confirmError) {
       return res.status(400).json({ mensagem: 'Erro ao deletar conformações', erro: confirmError })
@@ -385,9 +387,9 @@ route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, re
 
     //depois apaga o funcionario
     const { error: funcError } = await supabase
-      .from('funcionario')
+      .from('employee')
       .delete()
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
 
     if (funcError) {
       return res.status(400).json({ mensagem: 'Erro ao deletar funcionário', erro: funcError })
@@ -404,14 +406,14 @@ route.delete('/deletarFuncionario_master/:matricula_funcionario', async (req, re
 // Cadastrar escala e vincular ao funcionário
 // POST /cadastrarEscala
 route.post('/cadastrarEscala_master', async (req, res) => {
-  const obrigatorios = ['matricula_funcionario', 'data_inicio', 'tipo_escala']
+  const obrigatorios = ['registration', 'data_inicio', 'tipo_escala']
   const campoFaltando = validarCampos(obrigatorios, req.body)
   if (campoFaltando)
     return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
 
   try {
     const {
-      matricula_funcionario,
+      registration,
       data_inicio,
       tipo_escala,
       dias_n_trabalhados_escala_semanal,
@@ -485,9 +487,9 @@ if (precisa_dias_especificos) {
 }
     // Verificar funcionário
     const { data: funcionarioExistente } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
     if (!funcionarioExistente)
       return res.status(400).json({ mensagem: 'Funcionário não encontrado' })
@@ -520,9 +522,9 @@ if (precisa_dias_especificos) {
 
     // Vincular escala ao funcionário
     const { error: errorVinculo } = await supabase
-      .from('funcionario')
+      .from('employee')
       .update({ id_escala: escalaCriada.id_escala })
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
 
     if (errorVinculo) {
       return res
@@ -532,7 +534,7 @@ if (precisa_dias_especificos) {
 
     // notificar criação de escala
     await criarNotificacao({
-      matricula_funcionario,
+      registration,
       tipo_notificacao: 'Nova Escala',
       mensagem: `Sua nova escala foi cadastrada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
     })
@@ -543,7 +545,7 @@ if (precisa_dias_especificos) {
       .from('escala_confirmacao')
       .insert([
         {
-          matricula_funcionario: funcionarioExistente.matricula_funcionario,
+          registration: funcionarioExistente.registration,
           id_escala: escalaCriada.id_escala
         }
       ])
@@ -558,9 +560,9 @@ if (precisa_dias_especificos) {
 
     // Vincular o id da confirmação (id_confirmacao) ao funcionário
     const { error: errorVinculoConfirm } = await supabase
-      .from('funcionario')
+      .from('employee')
       .update({ id_confirmacao: confirmacaoCriada.id_confirmacao })
-      .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+      .eq('registration', funcionarioExistente.registration)
 
     if (errorVinculoConfirm) {
       console.error('Erro ao vincular confirmação ao funcionário:', errorVinculoConfirm)
@@ -575,14 +577,14 @@ if (precisa_dias_especificos) {
 
 // PUT /alterarEscala
 route.put('/alterarEscala_master', async (req, res) => {
-  const obrigatorios = ['matricula_funcionario', 'data_inicio', 'tipo_escala']
+  const obrigatorios = ['registration', 'data_inicio', 'tipo_escala']
   const campoFaltando = validarCampos(obrigatorios, req.body)
   if (campoFaltando)
     return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
 
   try {
     const {
-      matricula_funcionario,
+      registration,
       data_inicio,
       tipo_escala,
       dias_n_trabalhados_escala_semanal,
@@ -655,11 +657,11 @@ if (precisa_dias_especificos) {
     })
 }
 
-    // Verificar funcionário e setor
+    // Verificar funcionário e sector
     const { data: funcionarioExistente } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
     if (!funcionarioExistente)
       return res.status(400).json({ mensagem: 'Funcionário não encontrado' })
@@ -689,7 +691,7 @@ if (precisa_dias_especificos) {
 
     // notificar alteração de escala
     await criarNotificacao({
-      matricula_funcionario,
+      registration,
       tipo_notificacao: 'Atualização de Escala',
       mensagem: `Sua escala foi atualizada: Início em ${data_inicio}, Tipo: ${tipo_escala}. Por favor, confirme o recebimento da escala no sistema.`,
     })
@@ -702,14 +704,14 @@ if (precisa_dias_especificos) {
             .from('escala_confirmacao')
             .delete()
             .eq('id_escala', funcionarioExistente.id_escala)
-            .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+            .eq('registration', funcionarioExistente.registration)
     
         // criar nova confirmação para a escala atualizada
         const { data: confirmacaoCriada, error: errorConfirmacao } = await supabase
           .from('escala_confirmacao')
           .insert([
             {
-              matricula_funcionario: funcionarioExistente.matricula_funcionario,
+              registration: funcionarioExistente.registration,
               id_escala: escalaAtualizada.id_escala
             }
           ])
@@ -723,9 +725,10 @@ if (precisa_dias_especificos) {
     
         // atualizar o funcionário para apontar para a nova confirmação (usar id_confirmacao retornado)
         const { error: errorAtualizarFunc } = await supabase
-          .from('funcionario')
+          .from
+          ('employee')
           .update({ id_confirmacao: confirmacaoCriada.id_confirmacao })
-          .eq('matricula_funcionario', funcionarioExistente.matricula_funcionario)
+          .eq('registration', funcionarioExistente.registration)
     
         if (errorAtualizarFunc) {
           console.error('Erro ao atualizar funcionário com nova confirmação:', errorAtualizarFunc)
@@ -746,7 +749,8 @@ if (precisa_dias_especificos) {
 
 route.get('/listarEscalas_master', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('escala').select('*')
+    const { data, error } = await supabase
+    .from('scale').select('*')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao listar escalas', erro: error })
@@ -762,7 +766,7 @@ route.get('/listarEscalas_master', async (req, res) => {
 route.post('/cadastrarTurno_master', async (req, res) => {
   try {
     const obrigatorios = [
-      'matricula_funcionario',
+      'registration',
       'inicio_turno',
       'termino_turno',
       'duracao_turno',
@@ -773,14 +777,14 @@ route.post('/cadastrarTurno_master', async (req, res) => {
       return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
     }
 
-    const { matricula_funcionario, inicio_turno, termino_turno, duracao_turno, intervalo_turno } =
+    const { registration, inicio_turno, termino_turno, duracao_turno, intervalo_turno } =
       req.body
 
     // Verificar se funcionário existe
     const { data: funcionarioExistente, error: errorFuncionario } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
 
     if (errorFuncionario) {
@@ -807,7 +811,7 @@ route.post('/cadastrarTurno_master', async (req, res) => {
 
     // Inserir turno
     const { data: turnoCriado, error: errorTurno } = await supabase
-      .from('turno')
+      .from('shift')
       .insert([{ inicio_turno, termino_turno, duracao_turno, intervalo_turno }])
       .select('*')
       .single()
@@ -818,9 +822,9 @@ route.post('/cadastrarTurno_master', async (req, res) => {
 
     // Vincular turno criado ao funcionário
     const { data: turnoVinculado, error: errorVinculo } = await supabase
-      .from('funcionario')
+      .from('employee')
       .update({ id_turno: turnoCriado.id_turno })
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .select('*')
       .single()
 
@@ -832,7 +836,7 @@ route.post('/cadastrarTurno_master', async (req, res) => {
 
     // notificar criação de turno
     await criarNotificacao({
-      matricula_funcionario,
+      registration,
       tipo_notificacao: 'Novo Turno',
       mensagem: `Seu novo turno foi cadastrado: ${inicio_turno} - ${termino_turno}.`,
     })
@@ -850,7 +854,7 @@ route.post('/cadastrarTurno_master', async (req, res) => {
 route.put('/alterarTurno_master', async (req, res) => {
   try {
     const obrigatorios = [
-      'matricula_funcionario',
+      'registration',
       'inicio_turno',
       'termino_turno',
       'duracao_turno',
@@ -861,14 +865,14 @@ route.put('/alterarTurno_master', async (req, res) => {
       return res.status(400).json({ mensagem: `Preencha o campo obrigatório: ${campoFaltando}` })
     }
 
-    const { matricula_funcionario, inicio_turno, termino_turno, duracao_turno, intervalo_turno } =
+    const { registration, inicio_turno, termino_turno, duracao_turno, intervalo_turno } =
       req.body
 
     // Verificar se funcionário existe
     const { data: funcionarioExistente, error: errorFuncionario } = await supabase
-      .from('funcionario')
+      .from('employee')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .maybeSingle()
 
     if (errorFuncionario) {
@@ -890,7 +894,7 @@ route.put('/alterarTurno_master', async (req, res) => {
 
     // Alterar turno
     const { data: turnoAtualizado, error: errorTurno } = await supabase
-      .from('turno')
+      .from('shift')
       .update({ inicio_turno, termino_turno, duracao_turno, intervalo_turno })
       .eq('id_turno', funcionarioExistente.id_turno)
       .select('*')
@@ -902,7 +906,7 @@ route.put('/alterarTurno_master', async (req, res) => {
 
     // notificar alteração de turno
     await criarNotificacao({
-      matricula_funcionario,
+      registration,
       tipo_notificacao: 'Atualização de Turno',
       mensagem: `Seu turno foi atualizado: ${inicio_turno} - ${termino_turno}.`,
     })
@@ -918,7 +922,9 @@ route.put('/alterarTurno_master', async (req, res) => {
 
 route.get('/listarTurnos_master', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('turno').select('*')
+    const { data, error } = await supabase
+    .from('shift')
+    .select('*')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao listar turnos', erro: error })
@@ -929,100 +935,102 @@ route.get('/listarTurnos_master', async (req, res) => {
   }
 })
 
-//Setores
+//sectores
 
-// Criar Setor
-route.post('/cadastrarSetor', async (req, res) => {
+// Criar sector
+route.post('/cadastrarsector', async (req, res) => {
   try {
-    const { nome_setor } = req.body
+    const { nome_sector } = req.body
 
-    if (!nome_setor) {
-      return res.status(400).json({ mensagem: 'Informe o nome do setor' })
+    if (!nome_sector) {
+      return res.status(400).json({ mensagem: 'Informe o name do sector' })
     }
 
     // Verificar se já existe
-    const { data: setorExistente } = await supabase
-      .from('setor')
+    const { data: sectorExistente } = await supabase
+      .from('sector')
       .select('*')
-      .eq('nome_setor', nome_setor)
+      .eq('nome_sector', nome_sector)
       .maybeSingle()
 
-    if (setorExistente) {
-      return res.status(400).json({ mensagem: 'Setor já cadastrado' })
+    if (sectorExistente) {
+      return res.status(400).json({ mensagem: 'sector já cadastrado' })
     }
 
-    const { data, error } = await supabase.from('setor').insert([{ nome_setor }]).select('*')
+    const { data, error } = await supabase.from('sector').insert([{ nome_sector }]).select('*')
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao cadastrar setor', erro: error })
+      return res.status(400).json({ mensagem: 'Erro ao cadastrar sector', erro: error })
     }
 
-    //criar equipe padrao de adm no setor
-    await supabase.from('equipe').insert([{ nome_equipe: `${nome_setor}(ADM)`, id_setor: data[0].id_setor }])
+    //criar team padrao de adm no sector
+    await supabase.from('team').insert([{ nome_team: `${nome_sector}(ADM)`, id_sector: data[0].id_sector }])
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao criar equipe padrão do setor', erro: error })
+      return res.status(400).json({ mensagem: 'Erro ao criar team padrão do sector', erro: error })
     }
 
-    res.status(201).json({ mensagem: 'Setor cadastrado com sucesso', setor: data[0] })
+    res.status(201).json({ mensagem: 'sector cadastrado com sucesso', sector: data[0] })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
 
-// Listar Setores
+// Listar sectores
 route.get('/listarSetores', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('setor').select('id_setor, nome_setor')
+    const { data, error } = await supabase
+    .from('sector')
+    .select('*')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao listar setores', erro: error })
     }
 
-    res.status(200).json({ setores: data })
+    res.status(200).json({ sectores: data })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
 
-// Editar Setor
-route.put('/editarSetor/:id', async (req, res) => {
+// Editar sector
+route.put('/editarsector/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const { nome_setor } = req.body
+    const { nome_sector } = req.body
 
-    if (!nome_setor) {
-      return res.status(400).json({ mensagem: 'Informe o nome do setor' })
+    if (!nome_sector) {
+      return res.status(400).json({ mensagem: 'Informe o name do sector' })
     }
 
     const { data, error } = await supabase
-      .from('setor')
-      .update({ nome_setor })
-      .eq('id_setor', id)
+      .from('sector')
+      .update({ nome_sector })
+      .eq('id_sector', id)
       .select('*')
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao atualizar setor', erro: error })
+      return res.status(400).json({ mensagem: 'Erro ao atualizar sector', erro: error })
     }
 
-    res.status(200).json({ mensagem: 'Setor atualizado com sucesso', setor: data[0] })
+    res.status(200).json({ mensagem: 'sector atualizado com sucesso', sector: data[0] })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
 
-// Deletar Setor
-route.delete('/deletarSetor/:id', async (req, res) => {
+// Deletar sector
+route.delete('/deletarsector/:id', async (req, res) => {
   try {
     const { id } = req.params
 
-    const { error } = await supabase.from('setor').delete().eq('id_setor', id)
+    const { error } = await supabase.from('sector').delete().eq('id_sector', id)
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao deletar setor', erro: error })
+      return res.status(400).json({ mensagem: 'Erro ao deletar sector', erro: error })
     }
 
-    res.status(200).json({ mensagem: 'Setor deletado com sucesso' })
+    res.status(200).json({ mensagem: 'sector deletado com sucesso' })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
@@ -1065,7 +1073,8 @@ route.post('/adicionarFeriados_master', async (req, res) => {
 
 route.get('/listarFeriados_master', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('feriado').select('*')
+    const { data, error } = await supabase
+    .from('holiday').select('*')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao listar feriados', erro: error })
@@ -1097,7 +1106,7 @@ route.delete('/deletarFeriado_master/:id_feriado', async (req, res) => {
 route.post('/cadastrarDiaEspecifico_master', async (req, res) => {
   try {
 
-    const obrigatorios = ['matricula_funcionario', 'nome_diae', 'data_diae', 'descricao_diae']
+    const obrigatorios = ['registration', 'nome_diae', 'data_diae', 'descricao_diae']
     const campoFaltando = validarCampos(obrigatorios, req.body)
 
     if (campoFaltando) {
@@ -1106,13 +1115,13 @@ route.post('/cadastrarDiaEspecifico_master', async (req, res) => {
       })
     }
 
-    const { matricula_funcionario, nome_diae, data_diae, descricao_diae } = req.body
+    const { registration, nome_diae, data_diae, descricao_diae } = req.body
 
     // verifica se já existe um dia específico cadastrado na mesma data para o mesmo funcionário
     const { data: diaExistente, error: errorCheck } = await supabase
       .from('dias_especificos')
       .select('*')
-      .eq('matricula_funcionario', matricula_funcionario)
+      .eq('registration', registration)
       .eq('data_diae', data_diae)
       .maybeSingle()
 
@@ -1133,7 +1142,7 @@ route.post('/cadastrarDiaEspecifico_master', async (req, res) => {
     const { data: diaEspecifico, error } = await supabase
       .from('dias_especificos')
       .insert([{
-        matricula_funcionario,
+        registration,
         nome_diae,
         data_diae,
         descricao_diae
@@ -1150,7 +1159,7 @@ route.post('/cadastrarDiaEspecifico_master', async (req, res) => {
 
     // notificar funcionário sobre o novo dia específico
     await criarNotificacao({
-      matricula_funcionario,
+      registration,
       tipo_notificacao: 'Novo Dia Específico',
       mensagem: `Um novo dia específico foi adicionado: ${nome_diae} (${data_diae}). Verifique os detalhes no sistema.`
     })

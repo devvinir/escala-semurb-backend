@@ -1,23 +1,25 @@
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET
-
 const authToken = (req, res, next) => {
-  const token = req.headers.authorization
+  const authHeader = req.headers.authorization
 
-  if (!token) {
-    return res.status(401).json({ message: 'Acesso negado!' })
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Token não fornecido' })
   }
+
+  const token = authHeader.split(' ')[1]
 
   try {
-    const decoded = jwt.verify(token.replace('Bearer ', ''), JWT_SECRET)
-
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
     req.user = decoded
+    next()
   } catch (error) {
-    return res.status(400).json({ message: 'Token inválido!' })
-  }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ message: 'Token expirado' })
+    }
 
-  next()
+    return res.status(403).json({ message: 'Token inválido' })
+  }
 }
 
 export default authToken

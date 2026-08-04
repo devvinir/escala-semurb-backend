@@ -47,4 +47,5 @@ app.use(
 
 app.listen(3000, () => {
   console.log('Servidor rodando na porta 3000')
+  console.log(process.env.SUPABASE_URL)
 })

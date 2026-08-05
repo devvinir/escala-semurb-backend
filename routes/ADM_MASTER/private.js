@@ -42,8 +42,9 @@ async function criarNotificacao({
 route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   try {
     // buscar todos os funcionários trazendo id_sector e relacionamento sector.nome_setor
-    const { data, error } = await supabase.from
-    ('employee').select('id_sector, sector(name)')
+    const { data, error } = await supabase
+    .from('employee')
+    .select('id_sector, sector(name)')
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao buscar funcionários', erro: error })
@@ -53,11 +54,11 @@ route.get('/contabilizarFuncionariosSetor', async (req, res) => {
     const mapa = new Map()
     for (const f of data || []) {
       const id = f.id_sector ?? null
-      const name = f.sector?.nome_setor ?? 'Sem sector'
+      const name = f.sector?.name ?? 'Sem sector'
       const key = id === null ? 'null' : String(id)
 
       if (!mapa.has(key)) {
-        mapa.set(key, { id_sector: id, nome_setor: name, quantidade: 0 })
+        mapa.set(key, { id: id, name: name, quantidade: 0 })
       }
       mapa.get(key).quantidade += 1
     }
@@ -935,14 +936,14 @@ route.get('/listarTurnos_master', async (req, res) => {
   }
 })
 
-//sectores
+//sectors
 
 // Criar sector
 route.post('/cadastrarSetor', async (req, res) => {
   try {
-    const { nome_setor } = req.body
-    
-    if (!nome_setor) {
+    const { name } = req.body
+
+    if (!name) {
       return res.status(400).json({ mensagem: 'Informe o name do sector' })
     }
 
@@ -950,22 +951,27 @@ route.post('/cadastrarSetor', async (req, res) => {
     const { data: sectorExistente } = await supabase
       .from('sector')
       .select('*')
-      .eq('name', nome_setor)
+      .eq('name', name)
       .maybeSingle()
 
     if (sectorExistente) {
       return res.status(400).json({ mensagem: 'sector já cadastrado' })
     }
 
-    const { data, error } = await supabase.from('sector').insert([{ name: nome_setor }]).select('*')
+    const { data, error } = await supabase
+    .from('sector')
+    .insert([{ name: name }])
+    .select('*')
 
     if (error) {
         console.log(error.message)
       return res.status(400).json({ mensagem: 'Erro ao cadastrar sector', erro: error.message })
     }
-
+    const sector_name = name;
     //criar equipe padrao de adm no setor
-    await supabase.from('team').insert([{ name: `${nome_setor}(ADM)`, id_sector: data[0].id }])
+    await supabase
+    .from('team')
+    .insert([{ name: `${sector_name}(ADM)`, id_sector: data[0].id }])
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao criar team padrão do sector', erro: error })
@@ -977,7 +983,7 @@ route.post('/cadastrarSetor', async (req, res) => {
   }
 })
 
-// Listar sectores
+// Listar sectors
 route.get('/listarSetores', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -988,7 +994,7 @@ route.get('/listarSetores', async (req, res) => {
       return res.status(400).json({ mensagem: 'Erro ao listar setores', erro: error })
     }
 
-    res.status(200).json({ sectores: data })
+    res.status(200).json({ sectors: data })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
@@ -1001,13 +1007,13 @@ route.put('/editarsector/:id', async (req, res) => {
     const { nome_setor } = req.body
 
     if (!nome_setor) {
-      return res.status(400).json({ mensagem: 'Informe o name do sector' })
+      return res.status(400).json({ mensagem: 'Informe o nome do setor' })
     }
 
     const { data, error } = await supabase
       .from('sector')
-      .update({ nome_setor })
-      .eq('id_sector', id)
+      .update({ name })
+      .eq('id', id)
       .select('*')
 
     if (error) {
@@ -1025,7 +1031,10 @@ route.delete('/deletarsector/:id', async (req, res) => {
   try {
     const { id } = req.params
 
-    const { error } = await supabase.from('sector').delete().eq('id_sector', id)
+    const { error } = await supabase
+    .from('sector')
+    .delete()
+    .eq('id_sector', id)
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao deletar sector', erro: error })

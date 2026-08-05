@@ -30,6 +30,7 @@ route.post('/loginMaster', async (req, res) => {
     console.error('Erro ao fazer login:', error)
     res.status(500).json({ error: 'Erro com o servidor' })
   }
+  console.log('SERVICE ROLE:', process.env.SUPABASE_SERVICE_ROLE_KEY)
 })
 
 export default route

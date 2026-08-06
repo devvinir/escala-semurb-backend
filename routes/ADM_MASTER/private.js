@@ -41,7 +41,7 @@ async function criarNotificacao({
 //contabilizar funcionarios por sector para grafico
 route.get('/contabilizarFuncionariosSetor', async (req, res) => {
   try {
-    // buscar todos os funcionários trazendo id_sector e relacionamento sector.nome_setor
+    // buscar todos os funcionários trazendo id_sector e relacionamento sector.name
     const { data, error } = await supabase
     .from('employee')
     .select('id_sector, sector(name)')
@@ -280,7 +280,7 @@ route.put('/editarFuncionario_master/:registration', async (req, res) => {
       const { data: sectorData, error: sectorError } = await supabase
         .from('sector')
         .select('id_sector')
-        .eq('nome_setor', sector)
+        .eq('name', sector)
         .maybeSingle()
 
       if (sectorError || !sectorData) {
@@ -343,7 +343,7 @@ route.put('/editarFuncionario_master/:registration', async (req, res) => {
       .from('employee')
       .update(payloadToUpdate)
       .eq('registration', registration)
-      .select('email, phone, position, is_admin, sector(nome_setor)')
+      .select('email, phone, position, is_admin, sector(name)')
       .maybeSingle()
 
     if (error) {
@@ -1001,12 +1001,12 @@ route.get('/listarSetores', async (req, res) => {
 })
 
 // Editar sector
-route.put('/editarsector/:id', async (req, res) => {
+route.put('/editarSetor/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const { nome_setor } = req.body
+    const { name } = req.body
 
-    if (!nome_setor) {
+    if (!name) {
       return res.status(400).json({ mensagem: 'Informe o nome do setor' })
     }
 
@@ -1017,24 +1017,25 @@ route.put('/editarsector/:id', async (req, res) => {
       .select('*')
 
     if (error) {
-      return res.status(400).json({ mensagem: 'Erro ao atualizar sector', erro: error })
+        console.log(error)
+      return res.status(400).json({ mensagem: 'Erro ao atualizar setor', erro: error })
     }
 
-    res.status(200).json({ mensagem: 'sector atualizado com sucesso', sector: data[0] })
+    res.status(200).json({ mensagem: 'setor atualizado com sucesso', sector: data[0] })
   } catch (error) {
     res.status(500).json({ mensagem: 'Erro no servidor', erro: error.message })
   }
 })
 
 // Deletar sector
-route.delete('/deletarsector/:id', async (req, res) => {
+route.delete('/deletarSetor/:id', async (req, res) => {
   try {
     const { id } = req.params
 
     const { error } = await supabase
     .from('sector')
     .delete()
-    .eq('id_sector', id)
+    .eq('id', id)
 
     if (error) {
       return res.status(400).json({ mensagem: 'Erro ao deletar sector', erro: error })
